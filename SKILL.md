@@ -70,16 +70,20 @@ Os comandos ficam em `assets/commands/` e são instalados em `.claude/commands/`
    a pirâmide (unit → componente → integração → e2e) mais as camadas transversais (smoke, a11y,
    regressão visual, contrato, dados). Cada teste é visto **falhar no vermelho** (red-first) antes de
    valer como guarda.
-3. **Meça o que o teste VERIFICA, não só o que executa** (`references/estrategia.md`): cobertura por
+3. **Toda rota exposta nasce com matriz de acesso** (`references/categorias.md` §14): 4 personas
+   (anônimo, não privilegiado, privilegiado, burla) × cada rota do inventário derivado, status **e**
+   corpo, deny-by-default, públicas só na allowlist com dono, M == N, visto vermelho. Gate:
+   `scripts/check-route-authz.sh`. O pentest é complementar, não substituto.
+4. **Meça o que o teste VERIFICA, não só o que executa** (`references/estrategia.md`): cobertura por
    camada é contrato (não se baixa a régua), line coverage é piso, mutation testing é a meta.
-4. **Nada de efeito externo real em teste** (`references/execucao.md` §5 + `references/categorias.md`
+5. **Nada de efeito externo real em teste** (`references/execucao.md` §5 + `references/categorias.md`
    §9): provider = sink, endereço no domínio de teste, cap por execução — e a caixa se confere
    **lendo do sink por API**, com o guard provado por um teste que **espera a recusa**.
-5. **Teste flaky é bug, não "re-roda"** (`references/flaky.md`): detecta, torna determinístico, ou
+6. **Teste flaky é bug, não "re-roda"** (`references/flaky.md`): detecta, torna determinístico, ou
    coloca em quarentena **com prazo e dono** — nunca silencia pra sempre.
-6. **Gate no CI trava o merge e NÃO se desliga "por enquanto"** (`references/execucao.md`): teste,
+7. **Gate no CI trava o merge e NÃO se desliga "por enquanto"** (`references/execucao.md`): teste,
    a11y e CWV são bloqueantes; Q.A. é item da DoD.
-7. **Não trabalhe de memória** — os limites por camada, o "verde de verdade" e o fluxo plan-first
+8. **Não trabalhe de memória** — os limites por camada, o "verde de verdade" e o fluxo plan-first
    estão nos references. Aplique os pisos abaixo independentemente do reference carregado.
 
 Mapa de references — leia o que casa com a tarefa:
@@ -89,6 +93,7 @@ Mapa de references — leia o que casa com a tarefa:
 | **Property-based** (invariante em 4 formas, semente logada, contraexemplo vira teste), **mutation** (triage do sobrevivente em 3 caixas, score ≥ 80% no domínio crítico, queda > 2pp reprova) e **carga/perf** (smoke/stress/soak/spike/benchmark, SLO escrito ANTES, p95 +10% reprova) | `references/categorias.md` §§11–13 |
 | **Estratégia & pirâmide** (unit→componente→integração→e2e), teste testa **comportamento não "renderizou"**, guarda provada no vermelho (red-first), **cobertura útil não vaidade** (mínimos por camada + mutation), Q.A. como **DoD**, gates de CI que travam | `references/estrategia.md` |
 | **Categorias em detalhe:** unit agressivo, componente, integração, e2e, **smoke "verde de verdade"** (conteúdo + assertion negativa + self-check), **a11y (axe/WCAG 2.2 AA)**, **regressão visual**, **contrato** (consumer-driven) e **dados** (expectations/quarentena), **efeito externo — assertar e-mail/notificação LENDO DO SINK** (+ teste negativo do guard), matriz `simulated` de acessibilidade de rota | `references/categorias.md` |
+| **Matriz de acesso por rota (authz de endpoint):** 4 personas × cada rota do inventário derivado, status+corpo, tabela de burlas com oráculo, deny-by-default, allowlist de públicas, anti-enumeração, red-first; gate `scripts/check-route-authz.sh` (M == N) | `references/categorias.md` §14 |
 | **Flaky tests:** por que é bug (não "re-roda"), detecção (rodar N×, ordem aleatória, seed, `-race`), causas (tempo/sleep, estado compartilhado, rede real, relógio), **quarentena disciplinada** (prazo+dono, issue rastreável), determinismo | `references/flaky.md` |
 | **Execução & gates:** o **fluxo plan-first** (planejar→MD→aprovação→rodar faseado/de-uma-vez, watchdog, destrutivo gated, sem retry infinito), **test kit** + CLI único + saída machine-readable (`summary.json`), padrão de script, seeds/personas, **efeito externo em teste** (endereço `@test.<domain>`, sink Mailpit, `MAIL_MAX_PER_RUN`, pré-flight fail-closed), **integração com CI** (PR/pré-deploy/nightly, gate por `summary.json`, a11y/CWV), Makefile | `references/execucao.md` |
 
@@ -165,6 +170,8 @@ Não escreva do zero o que já está bundlado (movido da engineering pra cá):
   body + assertion negativa).
 - `scripts/smoke-selfcheck.sh` — o meta-teste anti "verde mentiroso": prova que o runner **consegue
   reportar FAIL** (normal=0; `--self-check`=0 **quando reportou o FAIL**, 1 quando NÃO reportou — smoke cego).
+- `scripts/check-route-authz.sh` — gate da matriz de acesso por rota: `--routes` (inventário) × `--matrix`
+  (4 personas por rota) + `--public-allowlist`; falha em rota sem linha, órfã, sem política ou pública sem dono.
 - `scripts/simulated/run.py` — scaffold do engine `rotas × personas × injections` (cobertura total de
   rotas: acessível pra quem deve, bloqueada pra quem não deve). O detalhe **ofensivo** das injeções é
   governado pela `schematize-pentest`; aqui o foco é **acessibilidade/cobertura de rota**.

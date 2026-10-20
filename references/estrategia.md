@@ -135,6 +135,9 @@ de teste, cumulativamente:
   de sucesso **e** falha **e** edge.
 - [ ] **Teste emulado (`simulated`) executado** — 100% das rotas do inventário acessíveis pra quem deve
   e bloqueadas pra quem não deve; **rota fantasma/morta = bloqueio** (`categorias.md`).
+- [ ] **Matriz de acesso por rota verde e completa (M == N)** — toda rota exposta com as 4 personas
+  (anônimo, não privilegiado, privilegiado, burla), status **e** corpo, deny-by-default, públicas só na
+  allowlist com dono; vista vermelha (`categorias.md` §14, `scripts/check-route-authz.sh`).
 - [ ] **Smoke em staging com asserção de CONTEÚDO + self-check** anti verde-mentiroso (`categorias.md`).
 - [ ] **a11y (axe/WCAG 2.2 AA) verde** e **regressão visual** sem diff não intencional (onde há UI).
 - [ ] **Testes de contrato** verdes entre produtor/consumidor (onde há integração de serviços).

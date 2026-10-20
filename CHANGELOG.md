@@ -2,6 +2,13 @@
 
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
+## [0.8.0] — 2026-10-20
+### Adicionado
+- Categoria 14 em `categorias.md`: **matriz de acesso por rota** (anônimo, autenticado sem privilégio, privilegiado e burlas), inventário derivado, deny-by-default, allowlist de públicas com dono, anti-enumeração e red-first.
+- Gate `scripts/check-route-authz.sh` (+ teste): falha se rota sem as 4 personas, órfã, sem política ou pública fora da allowlist (M == N).
+- Piso 10 em `assets/CLAUDE.md` e item de DoD em `estrategia.md`.
+- Porquê: rota entregando dado sem autenticação era bug recorrente; só teste permanente por rota, no PR, o impede.
+
 
 ## [0.7.0] — 2026-10-15
 ### Alterado

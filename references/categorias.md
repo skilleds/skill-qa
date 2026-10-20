@@ -19,6 +19,7 @@
 - 11. Property-based — invariante, não exemplo
 - 12. Mutation — o teste do teste
 - 13. Carga e performance — número com condição, não adjetivo
+- 14. Matriz de acesso por rota (authz de endpoint)
 
 ---
 
@@ -461,3 +462,99 @@ mutation. É por isso que a skill chama line coverage de **piso** e mutation de 
 **Ferramentas:** k6, Gatling, Locust, Vegeta, `wrk`, JMeter; para benchmark de função, o do
 ecossistema (`go test -bench`, `criterion` no Rust, `pytest-benchmark`, `Benchmark.NET`,
 `hyperfine` para CLI). Para subir dependência real em integração/carga local: **Testcontainers**.
+
+---
+
+## 14. Matriz de acesso por rota (authz de endpoint)
+
+> **Regra:** toda rota/endpoint/handler exposto **NASCE** com teste de matriz de acesso, no CI, no
+> nível **unit/componente** (sem subir infra real — roda no PR, em segundos). Para **cada** rota do
+> inventário o teste exercita 4 personas e afirma **status E corpo**. É diferente do `simulated` (§10,
+> cobertura de rota) e do **pentest** (`schematize-pentest`): o pentest é o engajamento ofensivo
+> periódico contra o sistema no ar; esta matriz é a guarda barata e contínua que impede a regressão
+> entre um pentest e outro. **Complementar, não substituto.**
+
+**Inventário derivado, nunca digitado.** A lista de rotas sai do código/spec (router, tabela de
+rotas do framework, OpenAPI) por um extrator no próprio teste. Digitar a lista à mão garante que a
+rota nova seja esquecida. O gate falha se existir rota sem linha na matriz (**M == N**): rota nova
+esquecida quebra o CI. Gate pronto: `scripts/check-route-authz.sh` (rotas × personas, órfã, sem
+política, pública fora da allowlist).
+
+**Deny-by-default.** Rota sem política declarada **falha** o teste. Rota pública é **exceção
+explícita** numa **allowlist versionada** com justificativa e dono por linha; a allowlist é revisada
+no PR (diff nela é decisão de segurança, não detalhe).
+
+**As 4 personas (por rota)**
+
+| # | Persona | Credencial | Esperado |
+|---|---|---|---|
+| 1 | **Anônimo** | nenhuma | `401`, corpo sem dado (exceto rota da allowlist) |
+| 2 | **Autenticado não privilegiado** | válida, sem a permissão/papel/tenant exigido | `403` (ou `404` se a política for não revelar), corpo sem dado |
+| 3 | **Privilegiado** | o que deve passar | `2xx` com o corpo do contrato |
+| 4 | **Tentativas de burla** | a tabela abaixo | sempre negado; nunca `2xx` nem dado |
+
+**Burlas mínimas por rota, com o oráculo**
+
+| Burla | Como tentar | Oráculo esperado |
+|---|---|---|
+| Token ausente/vazio/malformado | `Authorization:` omitido, `Bearer `, `Bearer x.y` | `401`, corpo genérico |
+| Expirado / assinatura inválida | JWT vencido; assinatura adulterada | `401` |
+| `alg=none` | JWT com `alg: none` e sem assinatura | `401` |
+| Outro audience/tenant | token válido emitido para outro `aud`/tenant | `401`/`403` |
+| Header de identidade forjado | `X-User-Id`, `X-Forwarded-*`, `X-Original-URL` vindos do cliente | ignorado: resultado igual ao anônimo |
+| Troca de método | `HEAD`, `OPTIONS`, `X-HTTP-Method-Override` | mesma política do método real; sem bypass |
+| Variação de path | `/x/`, `//x`, `/X`, `%2e%2e`, `%2f`, `;param`, `.json` | mesma negação (normaliza antes de autorizar) |
+| BOLA/IDOR | id de recurso de outro usuário/tenant | `403`/`404` conforme política, sem dado |
+| Mass assignment | body com `role`, `is_admin`, `tenant_id` | campo ignorado ou `400`; papel não muda |
+| Param sobrescrevendo identidade | `?user_id=`, `{"user_id":..}` | identidade vem do token, nunca do param |
+| Rota alternativa/versão antiga | `/v1` vs `/v2`, `/internal`, `/admin`, `/debug`, `/metrics`, `/health` com dados | mesma política (ou inexistente); sem dado |
+| Cache/CDN | resposta autenticada servida a anônimo | `Cache-Control: private/no-store`; `Vary: Authorization` |
+| GraphQL/batch/WebSocket/SSE | operação em lote ou handshake sem credencial | auth checada no handshake e por operação |
+| CORS permissivo | `Origin` hostil com credenciais | sem `Access-Control-Allow-Origin` refletido/`*` com credencial |
+
+**Negação não vaza.** `401` (anônimo) / `403` (sem permissão) / `404` (recurso de outro tenant, se a
+política for não revelar), com **corpo sem dado do recurso**. Quando a política é **anti-enumeração**,
+o corpo (e o tempo, dentro de tolerância) de "existe mas é de outro" é **idêntico** ao de "não
+existe" — afirme igualdade de corpo, não só de status.
+
+**Red-first (mutação).** O teste só vale depois de visto **vermelho**: remova a checagem de authz de
+um handler (ou troque `deny` por `allow` na política) e veja a matriz falhar naquela rota. Se nada
+quebra, a matriz decora. Registre o vermelho no PR (ou rode mutation na camada de authz, §12).
+
+**Esqueleto (agnóstico de linguagem, tabela-dirigido)**
+
+```text
+inventario   = extrair_rotas(router | openapi)            # derivado; nunca literal
+publicas     = ler("publicas.allowlist")                  # rota | justificativa | dono
+personas     = [anonimo, nao_privilegiado, privilegiado]
+burlas       = catalogo_de_burlas()                       # tabela acima
+
+assert nao_vazio(inventario)
+for rota in inventario:
+    politica = politica_declarada(rota)                   # ausente => FALHA (deny-by-default)
+    assert politica existe or rota in publicas
+    for persona in personas:
+        resp = chamar_handler(rota, credencial(persona))  # unit/componente, sem infra real
+        esperado = oraculo(rota, persona, politica)
+        assert resp.status == esperado.status
+        assert resp.corpo == esperado.corpo               # corpo, não só status
+        if esperado.nega: assert sem_dado_do_recurso(resp.corpo)
+    for burla in burlas.aplicaveis(rota):
+        resp = chamar_handler(rota, burla.requisicao)
+        assert resp.status in {401, 403, 404} and sem_dado_do_recurso(resp.corpo)
+assert linhas_da_matriz == len(inventario) * len(personas)   # M == N
+```
+
+**Como fica na prática (sem ficar preso a uma)**
+- **Go:** `httptest.NewRecorder` sobre o `http.Handler`/router; rotas via `chi.Walk`/`mux.Walk`;
+  `t.Run(rota+persona)` em tabela.
+- **Rust:** `tower::ServiceExt::oneshot` no `axum::Router` (sem socket); rotas da tabela do router ou
+  do OpenAPI gerado; `rstest`/loop de casos.
+- **TS:** `supertest`/`app.inject` (Fastify)/`fetch` sobre o handler com `vitest` `test.each`; rotas do
+  OpenAPI ou do registro do framework.
+- **Python:** `TestClient` (FastAPI/Starlette) ou `Client` do Django com `pytest.mark.parametrize`;
+  rotas de `app.routes`/schema OpenAPI.
+
+Em todas: sem rede, sem DB real (repositório fake ou in-memory), tokens assinados por chave de teste.
+O contrato do `check-route-authz.sh` espera a matriz exportada como `MÉTODO /path persona resultado`
+e roda no CI como segundo gate (primeiro o teste, depois a conferência M == N).
