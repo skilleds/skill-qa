@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-route-authz.sh — gate da matriz de acesso por rota (categorias.md §14).
+# strict-ok: coletor que soma achados e sai 1 no fim (set -e abortaria no primeiro, escondendo o resto)
 # Deny-by-default: toda rota do inventário tem as 4 personas na matriz (M == N), nenhuma linha órfã,
 # nenhuma rota sem política, e rota pública só com justificativa+dono na allowlist versionada.
 #
