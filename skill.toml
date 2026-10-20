@@ -3,7 +3,7 @@ name = "schematize-qa"
 tag = "Disciplina · Q.A./Testes"
 status = "beta"
 order = 21
-current_version = "0.7.0"
+current_version = "0.8.0"
 href = "/qa"
 
 [descriptions]

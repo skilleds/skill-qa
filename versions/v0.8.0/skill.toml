@@ -1,0 +1,12 @@
+slug = "qa"
+name = "schematize-qa"
+tag = "Disciplina · Q.A./Testes"
+status = "beta"
+order = 21
+current_version = "0.8.0"
+href = "/qa"
+
+[descriptions]
+pt = "A disciplina de Q.A./testes da casa (agnóstica de linguagem): estratégia e pirâmide (unit→componente→integração→e2e), teste que prova COMPORTAMENTO não 'renderizou', smoke 'verde de verdade' (conteúdo + self-check), a11y e regressão visual que travam, contrato/dados, flaky (detecção+quarentena), cobertura útil (mutation, não vaidade), Q.A. plan-first com aprovação, e gates de teste/a11y/CWV no CI. Extraída da engineering; segurança ofensiva é a pentest."
+en = "The house's Q.A./testing discipline (language-agnostic): strategy and pyramid (unit→component→integration→e2e), tests that prove BEHAVIOR not 'it rendered', 'truly-green' smoke (content + self-check), a11y and visual regression that block, contract/data tests, flaky (detection+quarantine), useful coverage (mutation, not vanity), plan-first Q.A. with approval, and test/a11y/CWV CI gates. Extracted from engineering; offensive security is pentest."
+es = "La disciplina de Q.A./pruebas de la casa (agnóstica de lenguaje): estrategia y pirámide (unit→componente→integración→e2e), pruebas que prueban COMPORTAMIENTO no 'renderizó', smoke 'verde de verdad' (contenido + self-check), a11y y regresión visual que bloquean, contrato/datos, flaky (detección+cuarentena), cobertura útil (mutation, no vanidad), Q.A. plan-first con aprobación, y gates de test/a11y/CWV en CI. Extraída de engineering; seguridad ofensiva es pentest."
