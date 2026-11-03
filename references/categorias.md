@@ -20,6 +20,7 @@
 - 12. Mutation — o teste do teste
 - 13. Carga e performance — número com condição, não adjetivo
 - 14. Matriz de acesso por rota (authz de endpoint)
+- 15. Resiliência do microserviço (piso 28)
 
 ---
 
@@ -134,11 +135,11 @@ Saúde do sistema pós-deploy, < 2min. **Falha = bloqueio de deploy.** Roda **an
 
 ## 6. Acessibilidade (a11y)
 
-WCAG 2.2 AA é **piso**, não enfeite. a11y é **gate** (trava o merge), não relatório opcional.
+WCAG 2.2 AA é **piso**, não enfeite. a11y é **gate** (trava a promoção), não relatório opcional.
 
 **MUST**
 - **axe automatizado** em componente e e2e (`@axe-core/playwright`, `jest-axe`, `axe-core`): zero
-  violações **sérias/críticas**. Violação séria trava o merge como qualquer teste vermelho.
+  violações **sérias/críticas**. Violação séria trava a promoção como qualquer teste vermelho.
 - **Teclado:** toda ação alcançável e operável só por teclado; ordem de foco lógica; **foco visível**;
   sem armadilha de foco. Testado por interação real, não presumido.
 - **Nome acessível** em todo controle (botão, link, campo): `getByRole(...).name` existe e faz sentido.
@@ -354,10 +355,10 @@ regressão.
 - **Cobertura:** 100% dos **módulos de domínio crítico** listados no plano de Q.A. têm ao menos
   **uma** propriedade. Não é métrica de linha: é lista nominal, e módulo sem propriedade aparece no
   relatório como **descoberto**, não como "não aplicável".
-- **Volume:** ≥ **1000 casos** por propriedade no nightly; ≥ 100 no PR (para não custar minutos).
+- **Volume:** ≥ **1000 casos** por propriedade no pré-hml/sob demanda; ≥ 100 por commit, local (para não custar minutos).
 - **Falha = bloqueio.** Contraexemplo encontrado reprova o run; "roda de novo que passa" é o oposto
   da técnica.
-- **Tempo:** propriedade que leva > 30s no PR sai para o nightly com nome — nunca é apagada em
+- **Tempo:** propriedade que leva > 30s por commit sai para o pré-hml com nome — nunca é apagada em
   silêncio.
 
 **Ferramentas** (por stack, no anexo volátil de versões da skill da linguagem correspondente): Hypothesis (Python),
@@ -384,7 +385,7 @@ mutation. É por isso que a skill chama line coverage de **piso** e mutation de 
 
 1. **Delimite o escopo.** Mutation no repo inteiro é caro e ninguém olha o relatório. Rode no
    **domínio crítico** — a lista nominal do plano de Q.A. (cálculo, authz, estado, dinheiro).
-2. **Rode no nightly**, nunca no PR (é 10–50× a suíte). No PR, rode **só nos arquivos alterados**
+2. **Rode pré-hml/sob demanda**, nunca por commit (é 10–50× a suíte). Por commit, rode **só nos arquivos alterados**
    (`--since`/incremental), com limiar próprio.
 3. **Triage do sobrevivente**, em três caixas: **(a) teste faltando** → escreva o teste (é o achado
    que interessa); **(b) mutante equivalente** — o mutante não muda o comportamento observável (ex.:
@@ -453,7 +454,7 @@ mutation. É por isso que a skill chama line coverage de **piso** e mutation de 
 - **Regressão** (baseline de perf versionado e comparação por release: `schematize-regression` →
   `references/desempenho.md`): p95 pior que **+10%** contra o baseline do último release reprova; taxa de erro
   acima do SLO reprova **sempre**, sem tolerância percentual.
-- **Soak:** ≥ **1h** no nightly de release, com **memória estável** (crescimento < 5% após o
+- **Soak:** ≥ **1h** no pré-release (sob demanda), com **memória estável** (crescimento < 5% após o
   aquecimento) — o vazamento só aparece no tempo.
 - **Spike:** o sistema **volta** ao p95 normal em ≤ 2 minutos após o pico. Não voltar é achado.
 - O resultado é **JSON versionado** ao lado do `summary.json`, como todo o resto — número em
@@ -468,7 +469,7 @@ ecossistema (`go test -bench`, `criterion` no Rust, `pytest-benchmark`, `Benchma
 ## 14. Matriz de acesso por rota (authz de endpoint)
 
 > **Regra:** toda rota/endpoint/handler exposto **NASCE** com teste de matriz de acesso, no CI, no
-> nível **unit/componente** (sem subir infra real — roda no PR, em segundos). Para **cada** rota do
+> nível **unit/componente** (sem subir infra real — roda por commit, local, em segundos). Para **cada** rota do
 > inventário o teste exercita 4 personas e afirma **status E corpo**. É diferente do `simulated` (§10,
 > cobertura de rota) e do **pentest** (`schematize-pentest`): o pentest é o engajamento ofensivo
 > periódico contra o sistema no ar; esta matriz é a guarda barata e contínua que impede a regressão
@@ -557,4 +558,42 @@ assert linhas_da_matriz == len(inventario) * len(personas)   # M == N
 
 Em todas: sem rede, sem DB real (repositório fake ou in-memory), tokens assinados por chave de teste.
 O contrato do `check-route-authz.sh` espera a matriz exportada como `MÉTODO /path persona resultado`
-e roda no CI como segundo gate (primeiro o teste, depois a conferência M == N).
+**e** o resultado da EXECUÇÃO: o próprio teste grava, para cada rota×persona, uma linha
+`MÉTODO /path persona observado status corpo-ok` (helper `authz_record` em `scripts/lib.sh`, chamado
+depois de afirmar status E corpo) e o gate roda com `--results`. Sem `--results` o gate reprova ("matriz só
+declarada"): linha `anonimo deny` sem teste executado, observado ≠ declarado ou corpo não afirmado
+reprovam. `--declarada` existe só para o exemplo/teste do próprio gate.
+
+---
+
+## 15. Resiliência do microserviço (piso 28)
+
+> **Regra:** todo microserviço é à parte e FUNCIONA SOZINHO (início, meio e fim). Isso é **testado**,
+> com testes **unitários, por serviço, a cada gate** — camada obrigatória da pirâmide, distinta do
+> **chaos** (infra, destrutivo, `schematize-infra` §7, pré-hml/sob demanda). Serviço sem os 7 testes
+> **não passa no gate de Q.A.**
+
+**Os 7 testes obrigatórios (nomeie-os com a tag, o gate procura pelo nome)**
+
+| # | Tag no nome do teste | O que afirma |
+|---|---|---|
+| 1 | `boot_sem_dependencias` | sobe e fica saudável com TODAS as dependências indisponíveis |
+| 2 | `dependencia_indisponivel_<dep>` (**um por dependência**) | timeout/5xx/conexão recusada → item vai para a fila durável, serviço segue vivo e saudável |
+| 3 | `restart_fila_cheia` | reinicia com fila cheia → drena sem perda nem duplicata |
+| 4 | `reentrega_idempotente` | a mesma mensagem entregue 2x produz 1 efeito (chave de idempotência) |
+| 5 | `dlq_envenenada` | mensagem envenenada → DLQ após N tentativas, sem travar a fila |
+| 6 | `shutdown_gracioso` | SIGTERM drena o em voo, persiste e sai sem perder item |
+| 7 | `crash_entre_persistir_e_confirmar` | crash simulado após persistir e antes do ack → sem perda (ack só depois do commit) |
+
+**Matriz M == N.** O serviço declara suas dependências em `resilience.yml` (`service:` +
+`dependencies:`); M dependências declaradas exigem N testes do caso 2, um por dependência.
+`dependencies: []` dispensa 2–5 (sem vizinho, sem fila); 1, 6 e 7 continuam.
+
+**Gate:** `bash scripts/check-resilience.sh <dir-do-servico>` (cópia herdada da engineering; exit 0/1/2).
+Heurística por nome: prova que o teste EXISTE e não está pulado (`.skip`/`ignore`/`xfail` não conta) —
+**não** que passa; quem prova que passa é a suíte (`summary.json`), que o gate de §6 já lê. Entra no
+`make ci`/`tools/ci.sh` por serviço e na DoD. Fila em memória não vale: o teste 3 reinicia o processo.
+
+**Fronteira com o chaos.** Estes 7 testes rodam em segundos, sem infra real (dependência fake que
+falha), a cada commit. O chaos (matar serviço/derrubar banco reais em hml) continua sendo a
+`schematize-infra` §7: operação nomeada do ops, aprovada no plano (`execucao.md` §1).

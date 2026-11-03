@@ -3,6 +3,17 @@
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+### Corrigido
+- **Piso 28:** nova camada "resiliência do microserviço" (`categorias.md` §15): os 7 testes por serviço, matriz M == N com `resilience.yml`, `scripts/check-resilience.sh` no gate/DoD/`make ci`; chaos continua sendo a camada de infra, distinta. Scripts `check-resilience`, `check-ritmo` e `check-ci-triggers` entram pelo mecanismo de herdados (`tools/herdados-arquivos.json`; sync a rodar pelo orquestrador).
+- **Piso 27:** §6 de `execucao.md`, `estrategia.md`, `categorias.md`, `assets/CLAUDE.md` e SKILL.md: "PR check / nightly / trava o merge" → gate por commit local (`make ci`/`tools/ci.sh`), pré-hml (tag), sob demanda; sem PR e sem cron.
+- `check-route-authz.sh` deixa de provar só a declaração: exige `--results` (linhas gravadas pelo teste via `authz_record`: observado == matriz, status, `corpo-ok`) ou `--declarada` explícito; 5 casos vermelhos novos.
+- Chaos em hml/prd e rollback = operação nomeada do ops (pisos 23/24); no overdev o plano aprovado é o PLAN/CHECKLIST e destrutivo sem aprovação vira `- [~]`.
+### Adicionado
+- Bloco "Herda os pisos 22–29".
+### Pendente (on-hold)
+- `[~]` extrator de inventário a partir do OpenAPI para `check-route-authz.sh` (hoje o inventário vem de arquivo).
+
 ## [0.8.0] — 2026-10-20
 ### Adicionado
 - Categoria 14 em `categorias.md`: **matriz de acesso por rota** (anônimo, autenticado sem privilégio, privilegiado e burlas), inventário derivado, deny-by-default, allowlist de públicas com dono, anti-enumeração e red-first.

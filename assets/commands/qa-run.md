@@ -6,6 +6,11 @@ argument-hint: "[caminho do plano aprovado em <projeto>_archive/qa/]"
 Execute o Q.A. **do plano aprovado** (`references/execucao.md` §1). Se não houver plano aprovado, rode
 o `/qa-plan` primeiro — **nada roda sem aprovação registrada**.
 
+## 0. Regras de entrega (pisos 22–28)
+- **Overdev:** o plano aprovado é o PLAN/CHECKLIST já aceito; não pergunte ao usuário. Passo destrutivo sem aprovação prévia = `- [~]` parkeado, nunca execução.
+- **Chaos, rollback e qualquer mudança em hml/prd** = operação nomeada do `<projeto>_ops` (a IA só faz dry-run/plano; prd é break-glass humano).
+- **Gate por commit é local** (`make ci`/`tools/ci.sh`); CI remoto só pré-hml. Rode `scripts/check-resilience.sh <serviço>` e `scripts/check-route-authz.sh --results`.
+
 ## 1. Confirme o contrato
 Carregue o plano de `${ARGUMENTS:-<projeto>_archive/qa/<último>}`. Rode **só** os passos aprovados
 (aprovação parcial = escopo efetivo). Reconfirme ambiente alvo e os passos marcados **destrutivos**.

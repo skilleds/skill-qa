@@ -9,7 +9,7 @@
 - 2. O que é um teste de verdade (comportamento, não "renderizou")
 - 3. Cobertura útil, não vaidade
 - 4. Q.A. como parte da Definition of Done
-- 5. Gates de CI que travam o merge
+- 5. Gates de CI que travam a promoção
 
 ---
 
@@ -45,6 +45,7 @@ ilusão de cobertura. **Teste no nível mais baixo que ainda enxerga o bug.**
 | **dados** | o dado que entra/sai satisfaz expectations; dado ruim é quarentenado | integração + pipeline |
 | **property-based** | invariantes valem pra **todo** input, não só os do exemplo (procedimento e limiar: `categorias.md` §11) | unit + domínio |
 | **mutation** | os testes **pegam** um bug injetado (mede o que verificam; score ≥ 80% no domínio crítico — `categorias.md` §12) | domínio crítico |
+| **resiliência do microserviço** | o serviço sobe e funciona sozinho: fila durável, DLQ, reentrega idempotente, shutdown gracioso, crash entre persistir e confirmar — **7 testes por serviço, a cada gate** (piso 28: `categorias.md` §15, `scripts/check-resilience.sh`) | unit/componente, por serviço |
 | **carga/perf** | o SLO se sustenta na carga real, e a cauda (p95/p99) não estourou (`categorias.md` §13) | integração + e2e |
 
 Detalhe de cada uma em `categorias.md`.
@@ -131,6 +132,7 @@ Q.A. **não é etapa de fim de sprint** — é gate de entrega. Uma task só est
 de teste, cumulativamente:
 
 - [ ] **Testes passam** (unit + integração), **cobertura nos mínimos** por camada (§3) — sem baixar régua.
+- [ ] **Resiliência (piso 28):** serviço com `resilience.yml` e os 7 testes (`check-resilience.sh` verde; M == N das dependências).
 - [ ] **Caminhos críticos** (auth/pagamento/authz/billing/eventos/multi-tenancy) com testes explícitos
   de sucesso **e** falha **e** edge.
 - [ ] **Teste emulado (`simulated`) executado** — 100% das rotas do inventário acessíveis pra quem deve
@@ -156,13 +158,13 @@ de teste, cumulativamente:
 
 ---
 
-## 5. Gates de CI que travam o merge
+## 5. Gates de CI que travam a promoção
 
 O gate é o que dá **dente** à disciplina. Sem gate, teste é sugestão.
 
-**MUST — o que trava o merge**
-- **Fail no `summary.json`** (`.totals.fail > 0`) trava o merge (`execucao.md`).
-- **a11y vermelho** (violação axe séria/crítica) trava o merge como qualquer teste.
+**MUST — o que trava a promoção**
+- **Fail no `summary.json`** (`.totals.fail > 0`) trava a promoção (`execucao.md`).
+- **a11y vermelho** (violação axe séria/crítica) trava a promoção como qualquer teste.
 - **Core Web Vitals (CWV) fora do orçamento** — LCP/INP/CLS acima do budget declarado — trava (onde há
   frontend; casa com o piso de performance da `schematize-web`).
 - **Cobertura abaixo do mínimo** (§3) trava.
@@ -173,16 +175,16 @@ O gate é o que dá **dente** à disciplina. Sem gate, teste é sugestão.
 
 **VETADO — o gate NÃO se desliga "temporariamente"**
 - Comentar o step de teste, marcar `continue-on-error: true`, `allow_failure`, `--no-verify`, baixar o
-  threshold "só nesse PR", ou mover o gate pra nightly "por enquanto" pra destravar um merge é
+  threshold "só nesse PR", ou mover o gate pro pré-hml "por enquanto" pra destravar uma promoção é
   **macaquice** (linha da §37 da engineering). O gate desligado **não volta** — vira dívida silenciosa
   que só aparece no incidente.
 - Exceção só existe com **ADR de aceite de risco** (dono + prazo de remediação datado) e **nunca** pra
   caminho crítico de segurança/auth/dados. "Depois eu religo" não é ADR.
 
 **SHOULD — feedback rápido**
-- PR check roda o rápido (smoke + unit afetado + a11y + lint) em minutos; pré-deploy roda o `all`;
-  nightly roda o `full` (inclui **chaos** — definido pela `schematize-infra`, `references/resiliencia.md` §7 —, mutation e carga). Detalhe da matriz em `execucao.md`.
-- Falha de smoke **pós-deploy** dispara rollback automático — o gate não é só pré-merge.
+- O gate por commit é local (`make ci`/`tools/ci.sh`: smoke + unit afetado + a11y + lint + resiliência) em minutos; o pré-hml (tag, uma vez) roda o `all`;
+  sob demanda/release roda o `full` (inclui **chaos** — definido pela `schematize-infra`, `references/resiliencia.md` §7 —, mutation e carga). Detalhe da matriz em `execucao.md`.
+- Falha de smoke **pós-deploy** dispara rollback automático — o gate não é só pré-promoção; o rollback é operação nomeada do ops (piso 24).
 
-> Um gate que se desliga sob pressão nunca esteve ligado. Ou ele trava o merge de verdade, ou é teatro
+> Um gate que se desliga sob pressão nunca esteve ligado. Ou ele trava a promoção de verdade, ou é teatro
 > de compliance.

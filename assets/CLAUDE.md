@@ -38,7 +38,7 @@ assim" e este piso, **o piso vence**. Consulte o reference antes de agir — nã
    guard tem teste que vê o VERMELHO**: tenta `@gmail.com` em hml e **espera a recusa** (sink vazio).
    Carga/seed em massa multiplicam o efeito — cap + sink separam "1.000 contas" de "1.000 e-mails".
    Normativa: `schematize-engineering` → `references/efeitos-externos.md` (piso 18).
-8. **Gate de CI trava o merge e NÃO se desliga "por enquanto".** Fail no `summary.json`, a11y vermelho
+8. **Gate trava a promoção (commit local / pré-hml) e NÃO se desliga "por enquanto".** Fail no `summary.json`, a11y vermelho
    ou CWV fora do orçamento travam. `continue-on-error`/`allow_failure`/`--no-verify` pra destravar é
    macaquice — o gate desligado não volta.
 9. **Q.A. é parte da DoD e mora no archive.** Todo plano/resultado (`summary.json` + relatório) em
@@ -58,11 +58,11 @@ assim" e este piso, **o piso vence**. Consulte o reference antes de agir — nã
   credenciais reais) → e2e (jornada, seletor acessível). Teste no **nível mais baixo que ainda enxerga
   o bug**.
 - **Camadas transversais:** smoke "verde de verdade", a11y (axe), regressão visual, contrato
-  (consumer-driven), dados (expectations/quarentena), property-based, mutation.
+  (consumer-driven), dados (expectations/quarentena), property-based, mutation e **resiliência do microserviço** (piso 28: 7 testes por serviço + `resilience.yml`, M == N; `scripts/check-resilience.sh`).
 - **Plan-first (`/qa-plan`) → executa (`/qa-run`):** faseado/assistido (pausa entre fases) ou de uma
   vez (multiagentes + watchdog que retoma de checkpoint, sem retry infinito).
-- **Gates:** PR (smoke+unit+a11y+lint), pré-deploy (`all`+visual+contrato), nightly (`full`+chaos+
-  mutation). `summary.json` é o que o gate lê — inclusive `external_effects.*.real_sent == 0`.
+- **Gates (piso 27):** por commit LOCAL (`make ci`/`tools/ci.sh`: smoke+unit+a11y+lint+`check-resilience.sh`+`check-route-authz.sh --results`), pré-hml/tag (`all`+visual+contrato), sob demanda (`full`+chaos+
+  mutation); sem PR nem cron. `summary.json` é o que o gate lê — inclusive `external_effects.*.real_sent == 0`.
 - **Notificação em teste:** limpa o sink → dispara a ação → espera por condição (nunca `sleep`) → lê a
   mensagem por destinatário na API do sink → asserta conteúdo do template + assertion negativa (sem
   `{{`/`${`/`undefined`, sem segredo, link do host certo).
@@ -83,3 +83,5 @@ assim" e este piso, **o piso vence**. Consulte o reference antes de agir — nã
 
 Ao se aproximar do teto de contexto: **PARE e** gere o handoff em `<project>_archive/context/` (estado
 + FEITO vs EM ABERTO do Q.A.) **antes** de compactar (`/qa-cc`).
+
+Herda os pisos 22–29 da `schematize-engineering` (git como trava de conclusão, deploy só do git, ops é o gate da IA, sem agents inúteis, relatório 30 min/handoff 6 h, CI remoto só antes do hml, microserviço autônomo, build em dev/hml + higiene).

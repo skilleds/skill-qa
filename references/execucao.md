@@ -70,6 +70,10 @@ planejamento, aprovação humana e execução controlada. Comandos: `/qa-plan` (
   **não dispensa** o gate.
 - Modo autônomo "de uma vez" roda por default só em `dev`/`staging`. Produção exige confirmação
   adicional explícita no momento da execução.
+- **Chaos em hml/prd e rollback são operações nomeadas do `<projeto>_ops`** (pisos 23/24): a IA só faz dry-run/plano;
+  prd é break-glass humano. Nada de `ssh`/`docker`/`kubectl` à mão nem `service-kill` direto na VPS.
+- **Dentro de um overdev** (piso: perguntar ao usuário é vetado) o plano é aprovado pelo PLAN/CHECKLIST já aceito;
+  passo destrutivo sem aprovação prévia vira `- [~]` parkeado, nunca execução.
 - **Sem retry infinito** no watchdog: limite de tentativas por passo, backoff, e escala pro humano ao
   estourar. "Ininterrupto até finalizar" é **retomar até concluir**, não repetir pra sempre (`flaky.md`).
 
@@ -110,7 +114,7 @@ Toda a malha de testes "do sistema vivo" mora num repo dedicado (`<project>_ops`
 <project> test                  # default: smoke
 <project> test unit | integration | e2e | smoke | a11y | visual | contract | data | simulated
 <project> test property         # property-based no dominio critico (categorias.md secao 11)
-<project> test mutation         # o teste do teste (categorias.md secao 12) — nightly, nao PR
+<project> test mutation         # o teste do teste (categorias.md secao 12) — pre-hml/sob demanda, nao por commit
 <project> test load             # carga/perf (categorias.md secao 13) — SO com sink+guard+cap
 <project> test all              # tudo exceto chaos+unit+load
 <project> test full             # all + chaos + unit + mutation + property
@@ -337,24 +341,29 @@ um recibo. Aqui o cap não é conforto, é o freio.
 O gate dá dente à disciplina. Detalhe do que trava (e do que **não pode** desligar) em
 `estrategia.md` §5.
 
-**MUST — matriz de execução**
-- **PR check** (rápido, ~3min): `smoke + unit afetado + a11y + lint`. Feedback em minutos.
-- **Pré-deploy**: `<project> test all` (full minus chaos+unit, ~6min) + regressão visual + contrato.
-- **Nightly**: `<project> test full` (inclui chaos + unit + **mutation** + carga).
+**MUST — matriz de execução (piso 27: o gate por commit é LOCAL; CI remoto só antes do hml)**
+- **Por commit, local** (`make ci` / `tools/ci.sh` / pre-commit, ~3min): `smoke + unit afetado + a11y + lint +
+  check-resilience.sh` (por serviço, piso 28) + `check-route-authz.sh --results` + `check-external-effects.sh`.
+- **Pré-hml** (uma vez, sobre o acumulado, tag `hml-*` ou `workflow_dispatch`): `<project> test all` (full minus
+  chaos+unit, ~6min) + regressão visual + contrato.
+- **Sob demanda / release** (`v*` ou a pedido): `<project> test full` (inclui chaos + unit + **mutation** + carga).
+  **Cron noturno só com `justificativa:` escrita no workflow** (piso 27); por padrão não existe.
+- Nunca `on: pull_request` nem `push` em branch: valide os workflows com `scripts/check-ci-triggers.sh`.
 
-**MUST — o que trava o merge**
+**MUST — o que trava a promoção (commit local / pré-hml)**
 - Fail no `summary.json` (`.totals.fail > 0`) **trava**.
 - **a11y** (violação axe séria/crítica) **trava**.
 - **CWV** fora do orçamento (LCP/INP/CLS acima do budget) **trava** (onde há frontend).
 - Cobertura abaixo do mínimo (`estrategia.md` §3) **trava**. "No tests found" no caminho novo **trava**.
 - **Efeito externo real fora de prd trava:** `external_effects.*.real_sent > 0` no `summary.json`
   (§5.6), provider de envio **real** em job de teste, ou o grep `gmail|hotmail|outlook|yahoo|icloud`
-  batendo em `tests/`, `seeds/`, `fixtures/`, `factories/` **travam o merge**. O gate espelho da
+  batendo em `tests/`, `seeds/`, `fixtures/`, `factories/` **travam a promoção**. O gate espelho da
   engineering é o `scripts/check-external-effects.sh`.
-- Falha de smoke **pós-deploy** dispara **rollback automático**.
+- **Serviço sem os 7 testes de resiliência ou sem `resilience.yml` trava** (`check-resilience.sh`, piso 28; `categorias.md` §15).
+- Falha de smoke **pós-deploy** pede **rollback — uma operação nomeada do `<projeto>_ops`** (pisos 23/24): a IA só faz dry-run/plano; em prd é break-glass humano. Nada de `rsync`/`docker`/`kubectl` à mão.
 
 **VETADO**: `continue-on-error`, `allow_failure`, `--no-verify`, comentar o step, baixar threshold "só
-nesse PR", ou mover o gate pra nightly "por enquanto" pra destravar um merge — o gate desligado não
+nesse PR", ou mover o gate pro pré-hml "por enquanto" pra destravar um merge — o gate desligado não
 volta (`estrategia.md` §5).
 
 **Dashboards**: `summary.json` é parseado pra empurrar `tests_pass_total`, `tests_fail_total`,
@@ -379,5 +388,5 @@ make coverage         # relatório de cobertura por camada
 make ci               # tudo que o CI roda (gates inclusos)
 ```
 
-> `make ci` é o que o gate roda — se passa local e passa no CI, é a **mesma** suíte. Divergência entre
+> `make ci` é o gate por commit (`tools/ci.sh` da casa, piso 27; os triggers do CI remoto se checam com `check-ci-triggers.sh`) — se passa local e passa no CI pré-hml, é a **mesma** suíte. Divergência entre
 > "verde na minha máquina" e "vermelho no CI" é ambiente não fixado (`flaky.md` §5), não azar.

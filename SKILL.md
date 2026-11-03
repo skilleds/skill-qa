@@ -65,7 +65,7 @@ Os comandos ficam em `assets/commands/` e são instalados em `.claude/commands/`
 
 1. **Plan-first sempre** (`/qa-plan`): a malha de Q.A. inclui passos potencialmente destrutivos
    (chaos, mutação, carga). **Nenhuma submissão de Q.A. roda às cegas** — planeja tudo, gera o MD,
-   pede aprovação. Leia `references/execucao.md`.
+   pede aprovação. **Dentro de um overdev** o plano aprovado é o PLAN/CHECKLIST já aceito (não se pergunta ao usuário); passo destrutivo sem aprovação prévia vira `- [~]` parkeado, nunca execução. Leia `references/execucao.md`.
 2. **Escreva teste que testa COMPORTAMENTO** (`references/estrategia.md` + `references/categorias.md`):
    a pirâmide (unit → componente → integração → e2e) mais as camadas transversais (smoke, a11y,
    regressão visual, contrato, dados). Cada teste é visto **falhar no vermelho** (red-first) antes de
@@ -81,8 +81,8 @@ Os comandos ficam em `assets/commands/` e são instalados em `.claude/commands/`
    **lendo do sink por API**, com o guard provado por um teste que **espera a recusa**.
 6. **Teste flaky é bug, não "re-roda"** (`references/flaky.md`): detecta, torna determinístico, ou
    coloca em quarentena **com prazo e dono** — nunca silencia pra sempre.
-7. **Gate no CI trava o merge e NÃO se desliga "por enquanto"** (`references/execucao.md`): teste,
-   a11y e CWV são bloqueantes; Q.A. é item da DoD.
+7. **O gate trava a promoção e NÃO se desliga "por enquanto"** (por commit local, `make ci`; CI remoto só pré-hml, piso 27) (`references/execucao.md`): teste,
+   a11y, CWV e **resiliência do microserviço** (piso 28: 7 testes + `resilience.yml`, `scripts/check-resilience.sh`, `categorias.md` §15) são bloqueantes; Q.A. é item da DoD.
 8. **Não trabalhe de memória** — os limites por camada, o "verde de verdade" e o fluxo plan-first
    estão nos references. Aplique os pisos abaixo independentemente do reference carregado.
 
@@ -93,9 +93,9 @@ Mapa de references — leia o que casa com a tarefa:
 | **Property-based** (invariante em 4 formas, semente logada, contraexemplo vira teste), **mutation** (triage do sobrevivente em 3 caixas, score ≥ 80% no domínio crítico, queda > 2pp reprova) e **carga/perf** (smoke/stress/soak/spike/benchmark, SLO escrito ANTES, p95 +10% reprova) | `references/categorias.md` §§11–13 |
 | **Estratégia & pirâmide** (unit→componente→integração→e2e), teste testa **comportamento não "renderizou"**, guarda provada no vermelho (red-first), **cobertura útil não vaidade** (mínimos por camada + mutation), Q.A. como **DoD**, gates de CI que travam | `references/estrategia.md` |
 | **Categorias em detalhe:** unit agressivo, componente, integração, e2e, **smoke "verde de verdade"** (conteúdo + assertion negativa + self-check), **a11y (axe/WCAG 2.2 AA)**, **regressão visual**, **contrato** (consumer-driven) e **dados** (expectations/quarentena), **efeito externo — assertar e-mail/notificação LENDO DO SINK** (+ teste negativo do guard), matriz `simulated` de acessibilidade de rota | `references/categorias.md` |
-| **Matriz de acesso por rota (authz de endpoint):** 4 personas × cada rota do inventário derivado, status+corpo, tabela de burlas com oráculo, deny-by-default, allowlist de públicas, anti-enumeração, red-first; gate `scripts/check-route-authz.sh` (M == N) | `references/categorias.md` §14 |
+| **Matriz de acesso por rota (authz de endpoint):** 4 personas × cada rota do inventário derivado, status+corpo, tabela de burlas com oráculo, deny-by-default, allowlist de públicas, anti-enumeração, red-first; gate `scripts/check-route-authz.sh --results` (M == N + execução) · **Resiliência do microserviço (piso 28)** `categorias.md` §15, `scripts/check-resilience.sh` | `references/categorias.md` §14 |
 | **Flaky tests:** por que é bug (não "re-roda"), detecção (rodar N×, ordem aleatória, seed, `-race`), causas (tempo/sleep, estado compartilhado, rede real, relógio), **quarentena disciplinada** (prazo+dono, issue rastreável), determinismo | `references/flaky.md` |
-| **Execução & gates:** o **fluxo plan-first** (planejar→MD→aprovação→rodar faseado/de-uma-vez, watchdog, destrutivo gated, sem retry infinito), **test kit** + CLI único + saída machine-readable (`summary.json`), padrão de script, seeds/personas, **efeito externo em teste** (endereço `@test.<domain>`, sink Mailpit, `MAIL_MAX_PER_RUN`, pré-flight fail-closed), **integração com CI** (PR/pré-deploy/nightly, gate por `summary.json`, a11y/CWV), Makefile | `references/execucao.md` |
+| **Execução & gates:** o **fluxo plan-first** (planejar→MD→aprovação→rodar faseado/de-uma-vez, watchdog, destrutivo gated, sem retry infinito), **test kit** + CLI único + saída machine-readable (`summary.json`), padrão de script, seeds/personas, **efeito externo em teste** (endereço `@test.<domain>`, sink Mailpit, `MAIL_MAX_PER_RUN`, pré-flight fail-closed), **integração com CI** (por commit local / pré-hml / sob demanda, gate por `summary.json`, a11y/CWV), Makefile | `references/execucao.md` |
 
 ## Pisos inegociáveis (VETADO — sem ADR de exceção)
 
@@ -121,7 +121,7 @@ Independente do reference, estes limites nunca são cruzados:
    nome acessível) e regressão visual são gate, não relatório opcional. Violação de a11y bloqueia o
    merge como qualquer teste vermelho. O ciclo completo do baseline visual (criar, atualizar com diff
    revisado, tolerância, determinismo) é da `schematize-regression` → `references/visual.md`; o piso
-   acima (trava o merge, `-u` nunca em massa) vale igual aqui.
+   acima (trava a promoção, `-u` nunca em massa) vale igual aqui.
 6. **Teste flaky é BUG, não "re-roda".** Flaky por corrida/tempo/estado é defeito. Detecta, torna
    determinístico, ou coloca em **quarentena com prazo e dono** (issue rastreável) — **nunca** silencia
    pra sempre nem esconde com retry infinito no gate.
@@ -129,8 +129,8 @@ Independente do reference, estes limites nunca são cruzados:
    a passo e **pede aprovação antes de executar**. Passo destrutivo só roda se constava no plano
    aprovado **e** com o gate de ambiente ligado; autônomo só em dev/staging por default. Q.A. sem plano
    aprovado registrado **não roda**.
-8. **Gate de CI trava o merge e NÃO se desliga "temporariamente".** Fail no `summary.json`
-   (`.totals.fail > 0`), a11y vermelho, ou CWV fora do orçamento **travam o merge**. Desligar o gate
+8. **Gate trava a promoção (commit local/pré-hml) e NÃO se desliga "temporariamente".** Fail no `summary.json`
+   (`.totals.fail > 0`), a11y vermelho, ou CWV fora do orçamento **travam a promoção**. Desligar o gate
    "só por enquanto" é macaquice — o gate desligado não volta.
 9. **Q.A. é parte da DoD e mora no archive.** Toda entrega passa pelos itens de teste da Definition of
    Done (§35 da engineering); todo plano/relatório de Q.A. mora em `<projeto>_archive/qa/` (§28), nunca
@@ -212,3 +212,5 @@ Esta skill é puxada quando a tarefa casa com a descrição. Para garantir o pis
 do repo, copie `assets/CLAUDE.md` para a raiz do projeto (`/qa-claude` mescla sem sobrescrever os
 blocos das outras skills). O `CLAUDE.md` pina o resumo e aponta pra cá; a skill entrega o detalhe e o
 andaime.
+
+Herda os pisos 22–29 da `schematize-engineering` (git como trava de conclusão, deploy só do git, ops é o gate da IA, sem agents inúteis, relatório 30 min/handoff 6 h, CI remoto só antes do hml, microserviço autônomo, build em dev/hml + higiene).

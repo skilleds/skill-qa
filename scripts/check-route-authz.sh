@@ -10,6 +10,11 @@
 #   --matrix     linhas "MÉTODO /path persona resultado"; persona ∈ anonimo|nao-privilegiado|
 #                privilegiado|burla; resultado ∈ allow|deny|none (none = sem política declarada)
 #   --public-allowlist  linhas "MÉTODO /path | justificativa | dono" (# comenta)
+#   --results    EXECUÇÃO: linhas "MÉTODO /path persona observado status corpo-ok" gravadas pelo próprio
+#                teste (lib.sh: authz_record). O gate exige, para TODA rota×persona, uma linha cujo
+#                `observado` == o resultado da matriz, status numérico e `corpo-ok` (corpo afirmado).
+#                Sem --results o gate só provaria a DECLARAÇÃO: reprova, a não ser que --declarada.
+#   --declarada  aceita a matriz sem resultados de execução (só p/ exemplo/teste do gate); avisa.
 # Sai 1 se: persona faltando, rota órfã, rota sem política (none), anônimo=allow fora da allowlist,
 # allowlist sem justificativa/dono, burla=allow (burla tem de ser negada).
 set -uo pipefail
@@ -17,11 +22,13 @@ _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$_DIR/lib.sh"
 
-ROUTES=""; MATRIX=""; ALLOW=""
+ROUTES=""; MATRIX=""; ALLOW=""; RESULTS=""; DECLARADA=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --routes) ROUTES="${2:-}"; shift 2 ;;
     --matrix) MATRIX="${2:-}"; shift 2 ;;
+    --results) RESULTS="${2:-}"; shift 2 ;;
+    --declarada) DECLARADA=1; shift ;;
     --public-allowlist) ALLOW="${2:-}"; shift 2 ;;
     *) echo "argumento desconhecido: $1" >&2; exit 2 ;;
   esac
@@ -29,17 +36,25 @@ done
 if [[ -z "$ROUTES" || -z "$MATRIX" || ! -f "$ROUTES" || ! -f "$MATRIX" ]]; then
   echo "uso: $0 --routes <arquivo> --matrix <arquivo> [--public-allowlist <arquivo>]" >&2; exit 2
 fi
+[[ -n "$RESULTS" && ! -f "$RESULTS" ]] && { echo "resultados inexistentes: $RESULTS" >&2; exit 2; }
 [[ -n "$ALLOW" && ! -f "$ALLOW" ]] && { echo "allowlist inexistente: $ALLOW" >&2; exit 2; }
 
 PERSONAS=(anonimo nao-privilegiado privilegiado burla)
 norm() { sed -e 's/#.*//' -e 's/[[:space:]]\+/ /g' -e 's/^ //;s/ $//' "$1" | grep -v '^$'; }
 
-declare -A INV MAT PUB
+declare -A INV MAT PUB RES
 while IFS= read -r l; do INV["$l"]=1; done < <(norm "$ROUTES")
 while read -r m p persona res _; do
   [[ -z "${m:-}" ]] && continue
   MAT["$m $p|$persona"]="$res"; MAT["$m $p|*"]=1
 done < <(norm "$MATRIX")
+
+if [[ -n "$RESULTS" ]]; then
+  while read -r m p persona obs status corpo _; do
+    [[ -z "${m:-}" ]] && continue
+    RES["$m $p|$persona"]="$obs $status $corpo"
+  done < <(norm "$RESULTS")
+fi
 
 test_section "allowlist de rotas públicas"
 if [[ -n "$ALLOW" ]]; then
@@ -64,6 +79,29 @@ for r in "${!INV[@]}"; do
     fi
   done
 done
+test_section "execução: resultado de teste por rota × persona"
+if [[ -n "$RESULTS" ]]; then
+  for r in "${!INV[@]}"; do
+    for p in "${PERSONAS[@]}"; do
+      exp="${MAT[$r|$p]:-}"; got="${RES[$r|$p]:-}"
+      [[ -z "$exp" ]] && continue
+      if [[ -z "$got" ]]; then test_fail "$r ($p): matriz declara '$exp' mas NENHUM teste executado gravou resultado"; continue; fi
+      read -r obs status corpo <<<"$got"
+      [[ "$obs" == "$exp" ]] || test_fail "$r ($p): matriz diz '$exp', teste observou '$obs'"
+      [[ "$status" =~ ^[1-5][0-9][0-9]$ ]] || test_fail "$r ($p): status '$status' inválido no resultado"
+      [[ "$corpo" == "corpo-ok" ]] || test_fail "$r ($p): corpo não afirmado (esperado 'corpo-ok', veio '${corpo:-vazio}') — piso 20: status E corpo"
+    done
+  done
+  for k in "${!RES[@]}"; do
+    [[ -z "${INV[${k%|*}]:-}" ]] && test_fail "resultado para rota fora do inventário: ${k%|*}"
+  done
+  test_pass "resultados de execução conferidos"
+elif [[ $DECLARADA -eq 1 ]]; then
+  test_skip "--declarada: matriz NÃO provada por execução (só declaração)"
+else
+  test_fail "matriz só declarada: passe --results <arquivo gravado pelo teste> (authz_record) para provar a execução"
+fi
+
 for k in "${!MAT[@]}"; do
   [[ "$k" == *"|*" ]] || continue
   r="${k%|*}"; [[ -z "${INV[$r]:-}" ]] && test_fail "rota ÓRFÃ na matriz (fora do inventário): $r"

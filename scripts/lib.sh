@@ -102,3 +102,10 @@ test_summary() {
     echo "${C_GRN}${C_BLD}── OK ${label}  (pass=${_PASS} skip=${_SKIP}) ──${C_RST}"
   fi
 }
+
+# authz_record <arquivo> <MÉTODO> <path> <persona> <observado allow|deny> <status> <corpo-ok|corpo-errado>
+# O teste da matriz de acesso (piso 20) grava UMA linha por rota×persona; check-route-authz.sh --results
+# consome o arquivo e reprova o que não foi executado. Chame depois de afirmar status E corpo.
+authz_record() {
+  printf '%s %s %s %s %s %s\n' "$2" "$3" "$4" "$5" "$6" "$7" >> "$1"
+}
