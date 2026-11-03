@@ -5,6 +5,7 @@ com versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [0.9.0] — 2026-11-03
 ### Corrigido
+- `scripts/simulated/run.py`: passa no ruff da casa sem afrouxar nada — saída via `emit()` (sem `print`), esquema da URL validado (só http/https, erro claro) com teste em `run.test.sh`, `noqa` inútil removido, `datetime.UTC`, `ruff format`; comportamento preservado.
 - **Piso 28:** nova camada "resiliência do microserviço" (`categorias.md` §15): os 7 testes por serviço, matriz M == N com `resilience.yml`, `scripts/check-resilience.sh` no gate/DoD/`make ci`; chaos continua sendo a camada de infra, distinta. Scripts `check-resilience`, `check-ritmo` e `check-ci-triggers` entram pelo mecanismo de herdados (`tools/herdados-arquivos.json`; sync a rodar pelo orquestrador).
 - **Piso 27:** §6 de `execucao.md`, `estrategia.md`, `categorias.md`, `assets/CLAUDE.md` e SKILL.md: "PR check / nightly / trava o merge" → gate por commit local (`make ci`/`tools/ci.sh`), pré-hml (tag), sob demanda; sem PR e sem cron.
 - `check-route-authz.sh` deixa de provar só a declaração: exige `--results` (linhas gravadas pelo teste via `authz_record`: observado == matriz, status, `corpo-ok`) ou `--declarada` explícito; 5 casos vermelhos novos.
