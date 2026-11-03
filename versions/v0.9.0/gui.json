@@ -1,0 +1,5 @@
+{
+  "actions": [
+    { "label": "Q.A.", "command": "/qa-plan", "needs_project": true, "context": "project", "order": 10 }
+  ]
+}
