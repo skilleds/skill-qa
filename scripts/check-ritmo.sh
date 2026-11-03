@@ -5,7 +5,7 @@
 #   arquivo faltar, se um carimbo faltar/for inválido, se ultimo_relatorio tiver > 30 min ou
 #   ultimo_handoff > 6 h em relação a --agora (default: agora). Vale durante sessão ativa.
 # Uso: bash scripts/check-ritmo.sh [--agora ISO-8601] [--max-relatorio MIN] [--max-handoff MIN] <archive>
-# Saída: exit 0 em dia, 1 vencido/ausente, 2 uso inválido. Ver `references/orquestracao.md` §9.8.
+# Saída: exit 0 em dia, 1 vencido/ausente, 2 uso inválido. Ver `schematize-engineering` -> `references/orquestracao.md` §9.8.
 # strict-ok: gate acumula achados e sai no fim (`schematize-shell` -> `references/piso.md` secao 1)
 set -uo pipefail
 AGORA=""; MAXR=30; MAXH=360; ARC=""
